@@ -74,6 +74,10 @@ char *argv0;
 #define ISCONTROLC1(c)		(BETWEEN(c, 0x80, 0x9f))
 #define ISCONTROL(c)		(ISCONTROLC0(c) || ISCONTROLC1(c))
 #define ISDELIM(u)		(utf8strchr(worddelimiters, u) != NULL)
+/* LIMIT 
+ * x, if less than a, a; else if greater than b, b 
+ * holds the variable to within bounds 
+ */
 #define LIMIT(x, a, b)		(x) = (x) < (a) ? (a) : (x) > (b) ? (b) : (x)
 #define USE_ARGB (alpha != OPAQUE && opt_embed == NULL)
 #define ATTRCMP(a, b)		((a).mode != (b).mode || (a).fg != (b).fg || \
@@ -609,9 +613,7 @@ xstrdup(char *s)
 	return s;
 }
 
-size_t
-utf8decode(char *c, Rune *u, size_t clen)
-{
+size_t utf8decode(char *c, Rune *u, size_t clen) {
 	size_t i, j, len, type;
 	Rune udecoded;
 
@@ -685,9 +687,7 @@ utf8strchr(char *s, Rune u)
 	return NULL;
 }
 
-size_t
-utf8validate(Rune *u, size_t i)
-{
+size_t utf8validate(Rune *u, size_t i) {
 	if (!BETWEEN(*u, utfmin[i], utfmax[i]) || BETWEEN(*u, 0xD800, 0xDFFF))
 		*u = UTF_INVALID;
 	for (i = 1; *u > utfmax[i]; ++i)
@@ -3174,12 +3174,14 @@ xloadcolor(int i, const char *name, Color *ncolor)
 	return XftColorAllocName(xw.dpy, xw.vis, xw.cmap, name, ncolor);
 }
 
-void
-xloadcols(void)
-{
+/* TODO document this function */
+void xloadcols(void) {
 	int i;
 	static int loaded;
 	Color *cp;
+
+    /* XftColor can be initialized and, for instance, XftDrawGlyphs() can be 
+     * called with it*/
 
 	if (loaded) {
 		for (cp = dc.col; cp < &dc.col[LEN(dc.col)]; ++cp)
@@ -3723,12 +3725,12 @@ xmakeglyphfontspecs(XftGlyphFontSpec *specs, const Glyph *glyphs, int len, int x
 	return numspecs;
 }
 
-void
-xdrawglyphfontspecs(const XftGlyphFontSpec *specs, Glyph base, int len, int x, int y)
-{
+void xdrawglyphfontspecs(const XftGlyphFontSpec *specs, Glyph base, int len, 
+        int x, int y) {
 	int charlen = len * ((base.mode & ATTR_WIDE) ? 2 : 1);
-	int winx = borderpx + x * xw.cw, winy = borderpx + y * xw.ch,
-	    width = charlen * xw.cw;
+	int winx = borderpx + x * xw.cw; 
+    int winy = borderpx + y * xw.ch;
+	int width = charlen * xw.cw;
 	Color *fg, *bg, *temp, revfg, revbg, truefg, truebg;
 	XRenderColor colfg, colbg;
 	XRectangle r;
@@ -3867,18 +3869,23 @@ xdrawglyph(Glyph g, int x, int y)
 	xdrawglyphfontspecs(&spec, g, numspecs, x, y);
 }
 
-void
-xdrawcursor(void)
-{
+/* if cursor in a selection, set ATTR_REVERSE bit  on old cursor mode
+ * */
+void xdrawcursor(void) {
 	static int oldx = 0, oldy = 0;
 	int curx;
 	Glyph g = {' ', ATTR_NULL, defaultbg, defaultcs}, og;
+    /* sel is a global */
 	int ena_sel = sel.ob.x != -1 && sel.alt == IS_SET(MODE_ALTSCREEN);
 	Color drawcol;
 
+    // #define LIMIT(x, a, b)		(x) = (x) < (a) ? (a) : (x) > (b) ? (b) : (x)
+    // x, if less than a, a; else if greater than b, b 
+    // holds the variable to within bounds
 	LIMIT(oldx, 0, term.col-1);
 	LIMIT(oldy, 0, term.row-1);
 
+    /* term is a global */
 	curx = term.c.x;
 
 	/* adjust position if in dummy */
@@ -3888,13 +3895,28 @@ xdrawcursor(void)
 		curx--;
 
 	/* remove the old cursor */
+    /* og, nice! */
 	og = term.line[oldy][oldx];
 	if (ena_sel && selected(oldx, oldy))
+        /* glyphs have modes; toggle ATTR_REVERSE here */
 		og.mode ^= ATTR_REVERSE;
 	xdrawglyph(og, oldx, oldy);
 
+    /* u is a Rune, a u32 */
+    /* term.line is *Glyph
+     * term.c is one of these:
+     *
+     * typedef struct {
+     * 	Glyph attr;   // current char attributes 
+     * 	int x;
+     * 	int y;
+     * 	char state;
+     * } TCursor;
+     */
+
 	g.u = term.line[term.c.y][term.c.x].u;
 
+    // XXX
 	/*
 	 * Select the right color for the right mode.
 	 */
@@ -3922,7 +3944,11 @@ xdrawcursor(void)
 		return;
 
 	/* draw the new one */
+    /*
+     * xw is a global XWindow, our own struct
+     */
 	if (xw.state & WIN_FOCUSED) {
+        /* cursor is an int, our cursor style */
 		switch (xw.cursor) {
 		case 7: /* st extension: snowman */
 			utf8decode("☃", &g.u, UTF_SIZ);
@@ -4400,9 +4426,7 @@ run(void)
 	}
 }
 
-void
-usage(void)
-{
+void usage(void) {
 	die("usage: %s [-aiv] [-c class] [-f font] [-g geometry]"
 	    " [-n name] [-o file]\n"
 	    "          [-T title] [-t title] [-w windowid]"
@@ -4413,9 +4437,7 @@ usage(void)
 	    " [stty_args ...]\n", argv0, argv0);
 }
 
-int
-main(int argc, char *argv[])
-{
+int main(int argc, char *argv[]) {
 	uint cols = 80, rows = 24;
 
 	xw.l = xw.t = 0;
@@ -4423,9 +4445,9 @@ main(int argc, char *argv[])
 	xw.cursor = cursorshape;
 
 	ARGBEGIN {
-	case 'a':
-		allowaltscreen = 0;
-		break;
+    case 'a':
+
+        break;
 	case 'c':
 		opt_class = EARGF(usage());
 		break;
@@ -4461,6 +4483,9 @@ main(int argc, char *argv[])
 		break;
 	case 'v':
 		die("%s " VERSION " (c) 2010-2016 st engineers\n", argv0);
+		break;
+	case 'x':
+		allowaltscreen = 0;
 		break;
 	default:
 		usage();

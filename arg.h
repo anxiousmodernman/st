@@ -8,7 +8,11 @@
 
 extern char *argv0;
 
-/* use main(int argc, char *argv[]) */
+/* 
+ * Argument helper macros
+ * In a style similar to https://9fans.github.io/plan9port/man/man3/arg.html 
+ */
+
 #define ARGBEGIN	for (argv0 = *argv, argv++, argc--;\
 					argv[0] && argv[0][0] == '-'\
 					&& argv[0][1];\
@@ -28,6 +32,7 @@ extern char *argv0;
 						break;\
 					argc_ = argv[0][0];\
 					switch (argc_)
+
 #define ARGEND			}\
 			}
 

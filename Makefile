@@ -1,4 +1,4 @@
-# st - simple terminal
+# st - simple terminal (Coleman's fork)
 # See LICENSE file for copyright and license details.
 
 include config.mk
